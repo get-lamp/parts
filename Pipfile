@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 sqlalchemy = "*"
 pydantic = "*"
+fastmcp = "*"
 
 [dev-packages]
 ruff = "*"
