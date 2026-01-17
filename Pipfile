@@ -4,9 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-sqlalchemy = "*"
 pydantic = "*"
 fastmcp = "*"
+sqlmodel = "*"
 
 [dev-packages]
 ruff = "*"
