@@ -29,8 +29,9 @@ class GUID(TypeDecorator):
 
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
+    name: str = Field(index=True, unique=True, nullable=False)
     parent_id: Optional[int] = Field(default=None, foreign_key="category.id")
+
     parent: Optional["Category"] = Relationship(
         back_populates="children", sa_relationship_kwargs={"remote_side": "Category.id"}
     )
@@ -43,9 +44,10 @@ class Part(SQLModel, table=True):
     uuid: UUID = Field(
         default_factory=uuid4, sa_column=Column(GUID, nullable=False, unique=True)
     )
-    identifier: Optional[str] = None
-    qty: Optional[int] = None
+    identifier: str = Field(index=True, unique=True, nullable=False)
+    qty: Optional[int] = 0
     datasheet: Optional[str] = None
     description: Optional[str] = None
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+
     category: Optional[Category] = Relationship(back_populates="parts")

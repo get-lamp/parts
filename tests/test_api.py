@@ -3,7 +3,7 @@ import os
 from uuid import uuid4
 from sqlmodel import Session, create_engine, SQLModel
 from parts.models import Part, Category
-from parts.api import create_item, get_item
+from parts.api import _insert, _get
 from parts.db import create_db_and_tables, engine
 
 
@@ -19,17 +19,17 @@ class TestAPI(unittest.TestCase):
     def test_create_and_get_category(self):
         with Session(self.engine) as session:
             category_in = Category(name="Electronics")
-            category = create_item(session, category_in)
+            category = _insert(session, category_in)
             self.assertIsNotNone(category.id)
             self.assertEqual(category.name, "Electronics")
 
-            fetched_category = get_item(session, Category, category.id)
+            fetched_category = _get(session, Category, category.id)
             self.assertEqual(fetched_category.name, "Electronics")
 
     def test_create_and_get_part(self):
         with Session(self.engine) as session:
             category_in = Category(name="Mechanics")
-            category = create_item(session, category_in)
+            category = _insert(session, category_in)
 
             part_uuid = uuid4()
             part_in = Part(
@@ -40,36 +40,36 @@ class TestAPI(unittest.TestCase):
                 datasheet="http://example.com/bolt.pdf",
                 description="M3 Hex Bolt",
             )
-            part = create_item(session, part_in)
+            part = _insert(session, part_in)
 
             self.assertIsNotNone(part.id)
             self.assertEqual(part.uuid, part_uuid)
             self.assertEqual(part.identifier, "Bolt_M3")
 
-            fetched_part = get_item(session, Part, part.id)
+            fetched_part = _get(session, Part, part.id)
             self.assertEqual(fetched_part.uuid, part_uuid)
             self.assertEqual(fetched_part.category.name, "Mechanics")
 
     def test_create_and_get_nested_categories(self):
         with Session(self.engine) as session:
             parent_category_in = Category(name="Electronics")
-            parent_category = create_item(session, parent_category_in)
+            parent_category = _insert(session, parent_category_in)
             self.assertIsNotNone(parent_category.id)
             self.assertEqual(parent_category.name, "Electronics")
 
             child_category_in = Category(name="Resistors", parent_id=parent_category.id)
-            child_category = create_item(session, child_category_in)
+            child_category = _insert(session, child_category_in)
             self.assertIsNotNone(child_category.id)
             self.assertEqual(child_category.name, "Resistors")
             self.assertEqual(child_category.parent_id, parent_category.id)
 
             # Fetch parent again to check children relationship
-            fetched_parent_category = get_item(session, Category, parent_category.id)
+            fetched_parent_category = _get(session, Category, parent_category.id)
             self.assertEqual(len(fetched_parent_category.children), 1)
             self.assertEqual(fetched_parent_category.children[0].name, "Resistors")
 
             # Fetch child again to check parent relationship
-            fetched_child_category = get_item(session, Category, child_category.id)
+            fetched_child_category = _get(session, Category, child_category.id)
             self.assertIsNotNone(fetched_child_category.parent)
             self.assertEqual(fetched_child_category.parent.name, "Electronics")
 
