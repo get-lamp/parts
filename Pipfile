@@ -7,6 +7,7 @@ name = "pypi"
 pydantic = "*"
 fastmcp = "*"
 sqlmodel = "*"
+prompt-toolkit = "*"
 
 [dev-packages]
 ruff = "*"

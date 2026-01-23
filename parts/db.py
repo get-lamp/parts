@@ -1,11 +1,10 @@
 from sqlmodel import create_engine, SQLModel, Session
-from typing import Generator
 import functools
 
-sqlite_file_name = "parts.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+SQLITE_FILE_NAME = "parts.db"
+SQLITE_URL = f"sqlite:///{SQLITE_FILE_NAME}"
 
-engine = create_engine(sqlite_url, echo=True)
+engine = create_engine(SQLITE_URL, echo=False)
 
 
 def create_db_and_tables():

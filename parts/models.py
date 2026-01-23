@@ -1,8 +1,14 @@
-from typing import List, Optional
+from typing import List, Optional, ClassVar
 from uuid import UUID, uuid4
-from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
+from typing import TYPE_CHECKING, List, Optional
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import CHAR, TypeDecorator, Column
 import uuid
+
+from sqlalchemy import select, union_all, literal
+from sqlalchemy.orm import aliased
+from sqlalchemy.orm import column_property
 
 
 class GUID(TypeDecorator):
@@ -41,9 +47,7 @@ class Category(SQLModel, table=True):
 
 class Part(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    uuid: UUID = Field(
-        default_factory=uuid4, sa_column=Column(GUID, nullable=False, unique=True)
-    )
+    uuid: UUID = Field(default_factory=uuid4, sa_column=Column(GUID, nullable=False, unique=True))
     identifier: str = Field(index=True, unique=True, nullable=False)
     qty: Optional[int] = 0
     datasheet: Optional[str] = None
@@ -51,3 +55,26 @@ class Part(SQLModel, table=True):
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
 
     category: Optional[Category] = Relationship(back_populates="parts")
+
+
+def recursive_hierarchy(model_class):
+    cat = aliased(model_class)
+
+    category_path = select(
+        model_class.id.label("id"),
+        model_class.name.label("path")
+    ).where(
+        model_class.parent_id.is_(None)
+    ).cte(name="category_path", recursive=True)
+
+    recursive = select(cat.id, (category_path.c.path + literal("/") + cat.name).label("path")).join(
+        category_path, cat.parent_id == category_path.c.id
+    )
+
+    category_path = category_path.union_all(recursive)
+
+    return column_property(select(category_path.c.path).where(category_path.c.id == Part.category_id).scalar_subquery())
+
+
+Part.path = recursive_hierarchy(Category)
+

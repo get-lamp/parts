@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "09cced23e4dfad2a974527fb1a37f27411b933a2010eb28aec871f30e8d8cbcf"
+            "sha256": "30b716596282c7fbd22b931e830cccb5fd32812359bca0ce2f5ce395920880d2"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -807,6 +807,15 @@
             "markers": "python_version >= '3.9'",
             "version": "==0.24.1"
         },
+        "prompt-toolkit": {
+            "hashes": [
+                "sha256:28cde192929c8e7321de85de1ddbe736f1375148b02f2e17edd840042b1be855",
+                "sha256:9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==3.0.52"
+        },
         "py-key-value-aio": {
             "extras": [
                 "disk",
@@ -1359,7 +1368,6 @@
                 "sha256:fd93c6f5d65f254ceabe97548c709e073d6da9883343adaa51bf1a913ce93f8e",
                 "sha256:fe187fc31a54d7fd90352f34e8c008cf3ad5d064d08fedd3de2e8df83eb4a1cf"
             ],
-            "index": "pypi",
             "markers": "python_version >= '3.7'",
             "version": "==2.0.45"
         },
@@ -1382,11 +1390,11 @@
         },
         "starlette": {
             "hashes": [
-                "sha256:4c4fda9b1bc67f84037d3d14a5112e523509c369d9d47b111b2f984b0cc5ba6c",
-                "sha256:fb460a3d6fd3c958d729fdd96aee297f89a51b0181f16401fe8fd4cb6129165d"
+                "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74",
+                "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==0.51.0"
+            "version": "==0.52.1"
         },
         "typer": {
             "hashes": [
@@ -1427,6 +1435,14 @@
             ],
             "markers": "python_version >= '3.10'",
             "version": "==0.40.0"
+        },
+        "wcwidth": {
+            "hashes": [
+                "sha256:4d478375d31bc5395a3c55c40ccdf3354688364cd61c4f6adacaa9215d0b3605",
+                "sha256:a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1"
+            ],
+            "markers": "python_version >= '3.6'",
+            "version": "==0.2.14"
         },
         "websockets": {
             "hashes": [
