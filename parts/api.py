@@ -3,12 +3,23 @@ import shutil
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, select, SQLModel
 
-from parts.db import create_db_and_tables, with_session
+from parts.db import create_db_and_tables, with_session, _insert
 from parts.models import Part, Category
 
 DATASHEET_DIR = "datasheets"
+
+
+def _get_or_create_token(db: Session, word: str) -> int:
+    # tries to get a token where token.word == word passed by argument
+    # returns the token id
+    pass
+
+
+def create_token_relation(db: Session, token_id: int, token_type: str, entity_type: str, entity_id: int):
+    # create an entry in token_entity table
+    pass
 
 
 @with_session
@@ -23,11 +34,7 @@ def list(db, args):
         parent_id = None
         target_category = None
         for category_name in category_path:
-            statement = (
-                select(Category)
-                .where(Category.name == category_name)
-                .where(Category.parent_id == parent_id)
-            )
+            statement = select(Category).where(Category.name == category_name).where(Category.parent_id == parent_id)
 
             target_category = db.exec(statement).first()
             if not target_category:
@@ -51,15 +58,19 @@ def init():
     _create_datasheet_path()
 
 
-def _insert(db: Session, obj: SQLModel):
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
-
-
-def _get(db: Session, model: SQLModel, item_id: int):
-    return db.get(model, item_id)
+def _tokenize(db, entity: SQLModel):
+    # Get of create a token from a word extracted from indexable fields.
+    # These tokens allow for map user input words to database entities
+    for attr in ["description", "identifier"]:
+        if hasattr(entity, attr):
+            for word in getattr(entity, attr).split(" "):
+                create_token_relation(
+                    db,
+                    token_id=_get_or_create_token(db, word=word),
+                    token_type=attr,
+                    entity_type=entity.__name__.lower(),
+                    entity_id=entity.id,
+                )
 
 
 def create_part(
@@ -70,7 +81,7 @@ def create_part(
     qty: int = 0,
     datasheet: str = None,
 ):
-    return _insert(
+    part = _insert(
         db=db,
         obj=Part(
             uuid=uuid4(),
@@ -82,6 +93,10 @@ def create_part(
         ),
     )
 
+    _tokenize(db, part)
+
+    return part
+
 
 def delete_part(db: Session, part: Part):
     db.delete(part)
@@ -89,8 +104,7 @@ def delete_part(db: Session, part: Part):
 
 
 def create_category(db: Session, name: str, parent_id: int = None):
-    category = Category(name=name, parent_id=parent_id)
-    return _insert(db=db, obj=category)
+    return _insert(db=db, obj=Category(name=name, parent_id=parent_id))
 
 
 def delete_category(db: Session, category: Category):
@@ -98,22 +112,8 @@ def delete_category(db: Session, category: Category):
     db.commit()
 
 
-def increase_qty(db: Session, part: Part, qty: int):
-    pass
-
-
-def decrease_qty(db: Session, uuid: UUID, qry: int):
-    pass
-
-
 def get_or_create_category(session: Session, name: str, parent_id: int = None) -> Category:
-    statement = select(Category).where(Category.name == name)
-
-    if parent_id is None:
-        statement = statement.where(Category.parent_id is None)
-    else:
-        statement = statement.where(Category.parent_id == parent_id)
-
+    statement = select(Category).where(Category.name == name).where(Category.parent_id == parent_id)
     category = session.exec(statement).first()
 
     if category:

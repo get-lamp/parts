@@ -1,12 +1,10 @@
-from typing import List, Optional, ClassVar
+from typing import List, Optional
 from uuid import UUID, uuid4
-from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import CHAR, TypeDecorator, Column
 import uuid
 
-from sqlalchemy import select, union_all, literal
+from sqlalchemy import select, literal
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm import column_property
 
@@ -60,12 +58,11 @@ class Part(SQLModel, table=True):
 def recursive_hierarchy(model_class):
     cat = aliased(model_class)
 
-    category_path = select(
-        model_class.id.label("id"),
-        model_class.name.label("path")
-    ).where(
-        model_class.parent_id.is_(None)
-    ).cte(name="category_path", recursive=True)
+    category_path = (
+        select(model_class.id.label("id"), model_class.name.label("path"))
+        .where(model_class.parent_id.is_(None))
+        .cte(name="category_path", recursive=True)
+    )
 
     recursive = select(cat.id, (category_path.c.path + literal("/") + cat.name).label("path")).join(
         category_path, cat.parent_id == category_path.c.id
@@ -78,3 +75,21 @@ def recursive_hierarchy(model_class):
 
 Part.path = recursive_hierarchy(Category)
 
+
+class Token(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    word: str = Field(index=True, unique=True, nullable=False)
+
+    token_entities: List["TokenEntity"] = Relationship(back_populates="token")
+
+
+class TokenEntity(SQLModel, table=True):
+    __tablename__ = "token_entity"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token_id: int = Field(foreign_key="token.id")
+    token_type: str
+    entity_id: int
+    entity_type: str
+
+    token: Token = Relationship(back_populates="token_entities")

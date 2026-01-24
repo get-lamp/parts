@@ -18,3 +18,14 @@ def with_session(func):
             return func(session, *args, **kwargs)
 
     return wrapper
+
+
+def _insert(db: Session, obj: SQLModel):
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def _get(db: Session, model: SQLModel, item_id: int):
+    return db.get(model, item_id)
