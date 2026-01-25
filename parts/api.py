@@ -6,20 +6,30 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, SQLModel
 
 from parts.db import create_db_and_tables, with_session, _insert
-from parts.models import Part, Category
+from parts.models import Part, Category, Token, TokenEntity
+
 
 DATASHEET_DIR = "datasheets"
 
 
 def _get_or_create_token(db: Session, word: str) -> int:
-    # tries to get a token where token.word == word passed by argument
-    # returns the token id
-    pass
+    statement = select(Token).where(Token.word == word)
+    token = db.exec(statement).first()
+    if not token:
+        token = _insert(db, Token(word=word))
+    return token.id
 
 
 def create_token_relation(db: Session, token_id: int, token_type: str, entity_type: str, entity_id: int):
-    # create an entry in token_entity table
-    pass
+    _insert(
+        db,
+        TokenEntity(
+            token_id=token_id,
+            token_type=token_type,
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+        ),
+    )
 
 
 @with_session
@@ -33,8 +43,12 @@ def list(db, args):
         category_path = args[0].split("/")
         parent_id = None
         target_category = None
-        for category_name in category_path:
-            statement = select(Category).where(Category.name == category_name).where(Category.parent_id == parent_id)
+        for category_identifier in category_path:
+            statement = (
+                select(Category)
+                .where(Category.identifier == category_identifier)
+                .where(Category.parent_id == parent_id)
+            )
 
             target_category = db.exec(statement).first()
             if not target_category:
@@ -64,11 +78,13 @@ def _tokenize(db, entity: SQLModel):
     for attr in ["description", "identifier"]:
         if hasattr(entity, attr):
             for word in getattr(entity, attr).split(" "):
+                token_id = _get_or_create_token(db, word=word)
+
                 create_token_relation(
                     db,
-                    token_id=_get_or_create_token(db, word=word),
+                    token_id=token_id,
                     token_type=attr,
-                    entity_type=entity.__name__.lower(),
+                    entity_type=entity.__class__.__name__.lower(),
                     entity_id=entity.id,
                 )
 
@@ -103,8 +119,10 @@ def delete_part(db: Session, part: Part):
     db.commit()
 
 
-def create_category(db: Session, name: str, parent_id: int = None):
-    return _insert(db=db, obj=Category(name=name, parent_id=parent_id))
+def create_category(db: Session, identifier: str, parent_id: int = None):
+    cat = _insert(db=db, obj=Category(identifier=identifier, parent_id=parent_id))
+    _tokenize(db, cat)
+    return cat
 
 
 def delete_category(db: Session, category: Category):
@@ -112,11 +130,11 @@ def delete_category(db: Session, category: Category):
     db.commit()
 
 
-def get_or_create_category(session: Session, name: str, parent_id: int = None) -> Category:
-    statement = select(Category).where(Category.name == name).where(Category.parent_id == parent_id)
+def get_or_create_category(session: Session, identifier: str, parent_id: int = None) -> Category:
+    statement = select(Category).where(Category.identifier == identifier).where(Category.parent_id == parent_id)
     category = session.exec(statement).first()
 
     if category:
         return category
 
-    return create_category(db=session, name=name, parent_id=parent_id)
+    return create_category(db=session, identifier=identifier, parent_id=parent_id)

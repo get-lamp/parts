@@ -13,7 +13,7 @@ def seed_data(session):
     api.init()
 
     # First pass: Create all categories based on non-leaf directories
-    category_map = {}  # (name, parent_id) -> category_object
+    category_map = {}  # (identifier, parent_id) -> category_object
 
     for root, dirs, files in os.walk(DATA_DIR):
         relative_path = os.path.relpath(root, DATA_DIR)
@@ -31,7 +31,7 @@ def seed_data(session):
                 if category_key not in category_map:
                     created_category = api.create_category(
                         db=session,
-                        name=component,
+                        identifier=component,
                         parent_id=parent_id_for_this_category,
                     )
 

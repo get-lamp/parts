@@ -33,7 +33,7 @@ class GUID(TypeDecorator):
 
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True, nullable=False)
+    identifier: str = Field(index=True, unique=True, nullable=False)
     parent_id: Optional[int] = Field(default=None, foreign_key="category.id")
 
     parent: Optional["Category"] = Relationship(
@@ -59,12 +59,12 @@ def recursive_hierarchy(model_class):
     cat = aliased(model_class)
 
     category_path = (
-        select(model_class.id.label("id"), model_class.name.label("path"))
+        select(model_class.id.label("id"), model_class.identifier.label("path"))
         .where(model_class.parent_id.is_(None))
         .cte(name="category_path", recursive=True)
     )
 
-    recursive = select(cat.id, (category_path.c.path + literal("/") + cat.name).label("path")).join(
+    recursive = select(cat.id, (category_path.c.path + literal("/") + cat.identifier).label("path")).join(
         category_path, cat.parent_id == category_path.c.id
     )
 
