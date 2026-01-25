@@ -50,7 +50,7 @@ class Part(SQLModel, table=True):
     qty: Optional[int] = 0
     datasheet: Optional[str] = None
     description: Optional[str] = None
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id", nullable=True)
 
     category: Optional[Category] = Relationship(back_populates="parts")
 

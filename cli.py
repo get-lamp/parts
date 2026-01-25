@@ -1,10 +1,8 @@
-from uuid import uuid4
-
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from sqlmodel import Session, select
 
-from parts.db import engine, _insert, _get
+from parts.db import engine
 from parts.models import Category, Part
 import parts.api as api
 

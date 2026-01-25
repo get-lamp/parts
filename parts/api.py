@@ -1,15 +1,26 @@
 import os
 import shutil
-from uuid import UUID, uuid4
+from uuid import uuid4
+import sys
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, SQLModel
 
-from parts.db import create_db_and_tables, with_session, _insert
+from parts.db import create_db_and_tables, with_session
 from parts.models import Part, Category, Token, TokenEntity
 
-
 DATASHEET_DIR = "datasheets"
+
+
+def _insert(db: Session, obj: SQLModel):
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def _get(db: Session, model: SQLModel, item_id: int):
+    return db.get(model, item_id)
 
 
 def _get_or_create_token(db: Session, word: str) -> int:
@@ -20,7 +31,7 @@ def _get_or_create_token(db: Session, word: str) -> int:
     return token.id
 
 
-def create_token_relation(db: Session, token_id: int, token_type: str, entity_type: str, entity_id: int):
+def _create_token_relation(db: Session, token_id: int, token_type: str, entity_type: str, entity_id: int):
     _insert(
         db,
         TokenEntity(
@@ -30,6 +41,44 @@ def create_token_relation(db: Session, token_id: int, token_type: str, entity_ty
             entity_id=str(entity_id),
         ),
     )
+
+
+def find_token(db, string: str):
+
+    tokens = db.exec(
+        select(
+            Token,
+            TokenEntity
+        ).where(
+            Token.word.contains(string)
+        ).join(
+            TokenEntity,
+        ).order_by(
+            TokenEntity.entity_type, TokenEntity.token_type
+        )
+    ).all()
+
+    if not tokens:
+        return []
+
+    entity_types = {}
+    token_types = {}
+    found = {}
+
+    for token, token_entity in tokens:
+        entity_types.setdefault(token_entity.entity_type, []).append(token_entity)
+
+    for cls_name, entities in entity_types.items():
+        cls = getattr(sys.modules[__name__], cls_name.capitalize())
+
+        for entity in entities:
+            token_types.setdefault(entity.token_type, []).append(entity)
+
+        result = db.exec(select(cls).where(getattr(cls, 'id').in_([ent.entity_id for ent in entities]))).all()
+
+        found.setdefault(cls_name, []).extend(result)
+
+    return found
 
 
 @with_session
@@ -76,11 +125,11 @@ def _tokenize(db, entity: SQLModel):
     # Get of create a token from a word extracted from indexable fields.
     # These tokens allow for map user input words to database entities
     for attr in ["description", "identifier"]:
-        if hasattr(entity, attr):
-            for word in getattr(entity, attr).split(" "):
-                token_id = _get_or_create_token(db, word=word)
+        if hasattr(entity, attr) and (prop := getattr(entity, attr)):
+            for word in prop.split(" "):
+                token_id = _get_or_create_token(db, word=word.lower())
 
-                create_token_relation(
+                _create_token_relation(
                     db,
                     token_id=token_id,
                     token_type=attr,
@@ -89,14 +138,7 @@ def _tokenize(db, entity: SQLModel):
                 )
 
 
-def create_part(
-    db: Session,
-    category_id: int,
-    identifier: str,
-    description: str,
-    qty: int = 0,
-    datasheet: str = None,
-):
+def create_part(db: Session, category_id: int, identifier: str, description: str, qty: int = 1, datasheet: str = None):
     part = _insert(
         db=db,
         obj=Part(
