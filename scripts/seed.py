@@ -4,8 +4,8 @@ import shutil
 from parts import api
 from parts.db import with_session
 
-DATA_DIR = "data"
-DATASHEET_DIR = "datasheets"
+DATA_DIR = "./data"
+DATASHEET_DIR = "./datasheets"
 
 
 @with_session
@@ -50,14 +50,15 @@ def seed_data(session):
             # The last component of the path is implicitly the part's identifier folder, not a category.
             # Its parent is the actual category.
             parent_category_id_for_part = None
+
             if len(path_components) > 1:
                 temp_parent_id = None
-                for component in path_components[
-                    :-1
-                ]:  # All components EXCEPT the last one (the part identifier folder)
+
+                # All components EXCEPT the last one (the part identifier folder)
+                for component in path_components[:-1]:
                     category_key = (component, temp_parent_id)
                     if category_key in category_map:
-                        temp_parent_id = category_map[category_key].id
+                        temp_parent_id = category_map[category_key].identifier
                     else:
                         print(f"Warning: Parent category {component} not found for path {relative_path}")
                         break
@@ -91,11 +92,11 @@ def seed_data(session):
 
                     api.create_part(
                         db=session,
-                        category_id=parent_category_id_for_part,
                         identifier=identifier,
+                        descript=description,
                         qty=qty,
-                        description=description,
                         datasheet=datasheet_path,
+                        cat_id=parent_category_id_for_part,
                     )
 
 

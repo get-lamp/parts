@@ -1,38 +1,38 @@
 import os
 import shutil
 from uuid import uuid4
-import sys
 
-from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, SQLModel
 
-from parts.db import create_db_and_tables, with_session
-from parts.models import Part, Category, Token, TokenEntity
+from parts import parser
+from parts.db import create_db_and_tables, db_insert
+from parts.models import Part, Category
+from parts.parser import TokenEntity, Token
 
 DATASHEET_DIR = "datasheets"
 
 
-def _insert(db: Session, obj: SQLModel):
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
+def init():
+    create_db_and_tables()
+    _create_datasheet_path()
 
 
-def _get(db: Session, model: SQLModel, item_id: int):
-    return db.get(model, item_id)
+def _create_datasheet_path():
+    if os.path.exists(DATASHEET_DIR):
+        shutil.rmtree(DATASHEET_DIR)
+    os.makedirs(DATASHEET_DIR)
 
 
 def _get_or_create_token(db: Session, word: str) -> int:
     statement = select(Token).where(Token.word == word)
     token = db.exec(statement).first()
     if not token:
-        token = _insert(db, Token(word=word))
+        token = db_insert(db, Token(word=word))
     return token.id
 
 
 def _create_token_relation(db: Session, token_id: int, token_type: str, entity_type: str, entity_id: int):
-    _insert(
+    db_insert(
         db,
         TokenEntity(
             token_id=token_id,
@@ -43,85 +43,7 @@ def _create_token_relation(db: Session, token_id: int, token_type: str, entity_t
     )
 
 
-def find_token(db, string: str):
-
-    tokens = db.exec(
-        select(
-            Token,
-            TokenEntity
-        ).where(
-            Token.word.contains(string)
-        ).join(
-            TokenEntity,
-        ).order_by(
-            TokenEntity.entity_type, TokenEntity.token_type
-        )
-    ).all()
-
-    if not tokens:
-        return []
-
-    entity_types = {}
-    token_types = {}
-    found = {}
-
-    for token, token_entity in tokens:
-        entity_types.setdefault(token_entity.entity_type, []).append(token_entity)
-
-    for cls_name, entities in entity_types.items():
-        cls = getattr(sys.modules[__name__], cls_name.capitalize())
-
-        for entity in entities:
-            token_types.setdefault(entity.token_type, []).append(entity)
-
-        result = db.exec(select(cls).where(getattr(cls, 'id').in_([ent.entity_id for ent in entities]))).all()
-
-        found.setdefault(cls_name, []).extend(result)
-
-    return found
-
-
-@with_session
-def list(db, args):
-    if not args:
-        # If no category specified, list all parts
-        statement = select(Part)
-        return db.exec(statement).all()
-
-    else:
-        category_path = args[0].split("/")
-        parent_id = None
-        target_category = None
-        for category_identifier in category_path:
-            statement = (
-                select(Category)
-                .where(Category.identifier == category_identifier)
-                .where(Category.parent_id == parent_id)
-            )
-
-            target_category = db.exec(statement).first()
-            if not target_category:
-                print(f"Category not found: {args[0]}")
-                return
-            parent_id = target_category.id
-
-        # List parts directly in the target category
-        statement = select(Part).where(Part.category_id == target_category.id).options(selectinload(Part.category))
-        return db.exec(statement).all()
-
-
-def _create_datasheet_path():
-    if os.path.exists(DATASHEET_DIR):
-        shutil.rmtree(DATASHEET_DIR)
-    os.makedirs(DATASHEET_DIR)
-
-
-def init():
-    create_db_and_tables()
-    _create_datasheet_path()
-
-
-def _tokenize(db, entity: SQLModel):
+def tokenize(db: Session, entity: SQLModel):
     # Get of create a token from a word extracted from indexable fields.
     # These tokens allow for map user input words to database entities
     for attr in ["description", "identifier"]:
@@ -138,45 +60,163 @@ def _tokenize(db, entity: SQLModel):
                 )
 
 
-def create_part(db: Session, category_id: int, identifier: str, description: str, qty: int = 1, datasheet: str = None):
-    part = _insert(
+def get_next_legal_token_types(sentence: str):
+    types, subtypes = zip(*map(lambda s: s.split(":"), parser.parse(sentence).keys()))
+    return set(types), set(subtypes)
+
+
+def list_categories(db, parent_id=None):
+    query = select(Category)
+
+    if parent_id:
+        query = query.where(Category.parent_id == parent_id)
+
+    return db.execute(query).scalars().all()
+
+
+def create_part(
+    db: Session, identifier: str, descript: str, qty: int = 1, category_identifier: str = None, datasheet: str = None
+):
+    part = db_insert(
         db=db,
         obj=Part(
             uuid=uuid4(),
             identifier=identifier,
             qty=qty,
-            description=description,
+            description=descript,
             datasheet=datasheet,
-            category_id=category_id,
+            category_id=category_identifier,
         ),
     )
 
-    _tokenize(db, part)
+    tokenize(db, part)
 
     return part
 
 
-def delete_part(db: Session, part: Part):
-    db.delete(part)
-    db.commit()
+def list_parts(db, category_id=None):
+    query = select(Part)
+
+    if category_id:
+        target_category = db.exec(select(Category).where(Category.identifier == category_id)).first()
+        if target_category:
+            query = query.join(Part.category).where(Category.path.contains(target_category))
+        else:
+            return []  # Return empty if category not found
+
+    return db.execute(query).scalars().all()
 
 
-def create_category(db: Session, identifier: str, parent_id: int = None):
-    cat = _insert(db=db, obj=Category(identifier=identifier, parent_id=parent_id))
-    _tokenize(db, cat)
+def create_category(db: Session, identifier: str, parent_id: int = None) -> Category:
+    cat = db_insert(db=db, obj=Category(uuid=uuid4(), identifier=identifier, parent_id=parent_id))
+
+    tokenize(db, cat)
+
     return cat
-
-
-def delete_category(db: Session, category: Category):
-    db.delete(category)
-    db.commit()
 
 
 def get_or_create_category(session: Session, identifier: str, parent_id: int = None) -> Category:
     statement = select(Category).where(Category.identifier == identifier).where(Category.parent_id == parent_id)
+
     category = session.exec(statement).first()
 
     if category:
         return category
 
     return create_category(db=session, identifier=identifier, parent_id=parent_id)
+
+
+"""
+@with_session
+def list(db, args):
+    if not args:
+        # If no category specified, list all parts
+
+        statement = select(Part)
+
+        return db.exec(statement).all()
+
+    else:
+        category_path = args[0].split("/")
+
+        parent_uuid = None
+
+        target_category = None
+
+        for category_identifier in category_path:
+            statement = (
+                select(Category)
+                .where(Category.identifier == category_identifier)
+                .where(Category.parent_uuid == parent_uuid)
+            )
+
+            target_category = db.exec(statement).first()
+
+            if not target_category:
+                print(f"Category not found: {args[0]}")
+
+                return
+
+            parent_uuid = target_category.id
+
+        # List parts directly in the target category
+
+        statement = select(Part).where(Part.category_id == target_category.id).options(selectinload(Part.category))
+
+        return db.exec(statement).all()
+
+
+def delete_part(db: Session, part: Part):
+    db.delete(part)
+
+    db.commit()
+
+
+def delete_category(db: Session, category: Category):
+    db.delete(category)
+
+    db.commit()
+
+
+@with_session
+def find_token(db, string: str):
+    return db.exec(select(Token).where(Token.word.contains(string)).order_by(Token.word)).all()
+
+
+@with_session
+def match_token(db, string: str, token_types=None, entity_types=None):
+    token_types = token_types or []
+
+    entity_types = entity_types or []
+
+    def _filter(q):
+        return q.where(
+            and_(
+                or_(*[TokenEntity.token_type == t for t in token_types]),
+                or_(*[TokenEntity.entity_type == t for t in entity_types]),
+            )
+        )
+
+    query = select(Token, TokenEntity).where(Token.word.contains(string)).join(TokenEntity)
+
+    query = _filter(query)
+
+    tokens = db.exec(query.order_by(TokenEntity.entity_type, TokenEntity.token_type)).all()
+
+    if not tokens:
+        return []
+
+    entity_types = {}
+
+    found = []
+
+    for token, token_entity in tokens:
+        entity_types.setdefault(token_entity.entity_type, []).append(token_entity)
+
+    for cls_name, entities in entity_types.items():
+        cls = getattr(sys.modules[__name__], cls_name.capitalize())
+
+        found += db.exec(select(cls).where(getattr(cls, "id").in_([ent.entity_id for ent in entities]))).all()
+
+    return found
+"""

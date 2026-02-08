@@ -1,3 +1,5 @@
 .idea
 data
-**/__pychache__
+__pycache__/
+*.py[cod]
+*$py.class

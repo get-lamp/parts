@@ -1,16 +1,49 @@
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from sqlmodel import Session, select
-
-from parts.db import engine
-from parts.models import Category, Part
+from prompt_toolkit.completion import Completer, Completion
+from sqlmodel import select
 import parts.api as api
+from parts.db import get_db_context
+from parts.models import Category, Part
+
+
+class GrammarAutocomplete(Completer):
+    def __init__(self):
+        self.sentence = []
+        super().__init__()
+
+    def get_completions(self, document, complete_event):
+        sentence = document.text.split(" ")[:-1]
+        last_word = document.text.split(" ")[-1]
+        next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
+
+        print(next_types, next_subtypes)
+
+        if len(last_word) >= 2 or len(sentence) >= 1:
+            matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
+
+            for match in matches:
+                yield Completion(match.identifier, start_position=-len(last_word))
+
+        """
+        # keywords
+        for keyword in self.grammar.keywords:
+            if keyword.startswith(last_word):
+                yield Completion(keyword, start_position=-len(last_word))
+
+        # identifiers
+        if len(last_word) >= 2:
+            matches = parts.parser.api.match_token(last_word, entity_types=[], token_types=["identifier"])
+
+            for match in matches:
+                yield Completion(match.identifier, start_position=-len(last_word))
+        """
 
 
 def main():
     # api.init()
+
     session = PromptSession()
-    completer = WordCompleter(["add", "del", "list", "help", "exit"], ignore_case=True)
+    completer = GrammarAutocomplete()
 
     while True:
         try:
@@ -27,7 +60,7 @@ def main():
                 list_items(args)
             elif command == "help":
                 show_help()
-            elif command == "exit":
+            elif command in ("exit", "q"):
                 break
             else:
                 print(f"Unknown command: {command}")
@@ -46,7 +79,7 @@ def add(args):
     identifier = args[1]
     description = " ".join(args[2:]) if len(args) > 2 else ""
 
-    with Session(engine) as session:
+    with get_db_context() as session:
         parent_id = None
         for category_identifier in category_path:
             category = api.get_or_create_category(session, identifier=category_identifier, parent_id=parent_id)
@@ -68,7 +101,7 @@ def delete(args):
 
     identifier = args[0]
 
-    with Session(engine) as session:
+    with get_db_context() as session:
         # Try to find and delete a part
         statement = select(Part).where(Part.identifier == identifier)
         part = session.exec(statement).first()

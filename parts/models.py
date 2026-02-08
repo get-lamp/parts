@@ -1,12 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, ClassVar
 from uuid import UUID, uuid4
+
+from sqlalchemy.ext.hybrid import hybrid_property, Comparator
 from sqlmodel import Field, Relationship, SQLModel
-from sqlalchemy import CHAR, TypeDecorator, Column
+from sqlalchemy import CHAR, TypeDecorator, Column, select
 import uuid
 
-from sqlalchemy import select, literal
 from sqlalchemy.orm import aliased
-from sqlalchemy.orm import column_property
 
 
 class GUID(TypeDecorator):
@@ -31,8 +31,30 @@ class GUID(TypeDecorator):
             return uuid.UUID(value)  # Convert back to uuid.UUID object
 
 
+class AncestorComparator(Comparator):
+    def operate(self, op, other, **kwargs):
+        if op.__name__ != "contains_op":  # Corrected from "contains"
+            raise NotImplementedError()
+
+        ancestor_id = other.id if hasattr(other, "id") else other
+
+        cls = self.__clause_element__()  # This is the Category class
+
+        descendants_cte = (
+            select(cls.id.label("id")).where(cls.id == ancestor_id).cte(name="descendants_cte", recursive=True)
+        )
+
+        category_alias = aliased(cls, name="category_alias")
+        descendants_cte = descendants_cte.union_all(
+            select(category_alias.id).join(descendants_cte, category_alias.parent_id == descendants_cte.c.id)
+        )
+
+        return self.__clause_element__().id.in_(select(descendants_cte.c.id))
+
+
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    uuid: UUID = Field(default_factory=uuid4, sa_column=Column(GUID, nullable=False, unique=True))
     identifier: str = Field(index=True, unique=True, nullable=False)
     parent_id: Optional[int] = Field(default=None, foreign_key="category.id")
 
@@ -42,6 +64,22 @@ class Category(SQLModel, table=True):
     children: List["Category"] = Relationship(back_populates="parent")
     parts: List["Part"] = Relationship(back_populates="category")
 
+    path: ClassVar[List["Category"]]
+
+    @hybrid_property
+    def path(self):
+        """Returns the path of ancestor categories as a list, from the root to the current category."""
+        path_list = []
+        curr = self
+        while curr:
+            path_list.insert(0, curr)
+            curr = curr.parent
+        return path_list
+
+    @path.comparator
+    def path(cls):
+        return AncestorComparator(cls)
+
 
 class Part(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -50,46 +88,5 @@ class Part(SQLModel, table=True):
     qty: Optional[int] = 0
     datasheet: Optional[str] = None
     description: Optional[str] = None
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id", nullable=True)
-
+    category_id: Optional[str] = Field(default=None, foreign_key="category.identifier", nullable=True)
     category: Optional[Category] = Relationship(back_populates="parts")
-
-
-def recursive_hierarchy(model_class):
-    cat = aliased(model_class)
-
-    category_path = (
-        select(model_class.id.label("id"), model_class.identifier.label("path"))
-        .where(model_class.parent_id.is_(None))
-        .cte(name="category_path", recursive=True)
-    )
-
-    recursive = select(cat.id, (category_path.c.path + literal("/") + cat.identifier).label("path")).join(
-        category_path, cat.parent_id == category_path.c.id
-    )
-
-    category_path = category_path.union_all(recursive)
-
-    return column_property(select(category_path.c.path).where(category_path.c.id == Part.category_id).scalar_subquery())
-
-
-Part.path = recursive_hierarchy(Category)
-
-
-class Token(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    word: str = Field(index=True, unique=True, nullable=False)
-
-    token_entities: List["TokenEntity"] = Relationship(back_populates="token")
-
-
-class TokenEntity(SQLModel, table=True):
-    __tablename__ = "token_entity"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    token_id: int = Field(foreign_key="token.id")
-    token_type: str
-    entity_id: int
-    entity_type: str
-
-    token: Token = Relationship(back_populates="token_entities")
