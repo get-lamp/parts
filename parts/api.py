@@ -1,11 +1,13 @@
 import os
 import shutil
+import sys
 from uuid import uuid4
 
+from sqlalchemy import and_, or_
 from sqlmodel import Session, select, SQLModel
 
 from parts import parser
-from parts.db import create_db_and_tables, db_insert
+from parts.db import create_db_and_tables, db_insert, with_db
 from parts.models import Part, Category
 from parts.parser import TokenEntity, Token
 
@@ -182,8 +184,10 @@ def delete_category(db: Session, category: Category):
 def find_token(db, string: str):
     return db.exec(select(Token).where(Token.word.contains(string)).order_by(Token.word)).all()
 
+"""
 
-@with_session
+
+@with_db
 def match_token(db, string: str, token_types=None, entity_types=None):
     token_types = token_types or []
 
@@ -219,4 +223,3 @@ def match_token(db, string: str, token_types=None, entity_types=None):
         found += db.exec(select(cls).where(getattr(cls, "id").in_([ent.entity_id for ent in entities]))).all()
 
     return found
-"""

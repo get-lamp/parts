@@ -15,7 +15,7 @@ def get_db_context():
     return Session(_engine)
 
 
-def with_session(func):
+def with_db(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with Session(_engine) as session:

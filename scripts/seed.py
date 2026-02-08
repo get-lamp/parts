@@ -2,13 +2,13 @@ import os
 import shutil
 
 from parts import api
-from parts.db import with_session
+from parts.db import with_db
 
 DATA_DIR = "./data"
 DATASHEET_DIR = "./datasheets"
 
 
-@with_session
+@with_db
 def seed_data(session):
     api.init()
 

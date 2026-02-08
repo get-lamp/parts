@@ -16,8 +16,6 @@ class GrammarAutocomplete(Completer):
         last_word = document.text.split(" ")[-1]
         next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
 
-        print(next_types, next_subtypes)
-
         if len(last_word) >= 2 or len(sentence) >= 1:
             matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
 
