@@ -11,3 +11,9 @@ This document serves as dynamic context for the Gemini CLI agent, updated automa
 ### Manual Additions (Preserve between markers):
 <!-- MANUAL_ADDITIONS_START -->
 <!-- MANUAL_ADDITIONS_END -->
+
+## Active Technologies
+- Python + SQLModel, Ruff (001-cli-commands)
+
+## Recent Changes
+- 001-cli-commands: Added Python + SQLModel, Ruff

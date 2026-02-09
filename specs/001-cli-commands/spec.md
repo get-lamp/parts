@@ -53,6 +53,7 @@ As a user, I want the CLI to provide intelligent autocomplete suggestions to spe
 
 - **DP-001**: Autocomplete functionality is dependent on the existing `parts/api.py::get_next_legal_token_types` function for narrowing down suggestions. This function can be refactored or improved as needed.
 - **DP-002**: Autocomplete results MUST be cached in `parts.parser.LEXICON`. The API will check the cache before computing new suggestions. The existing `LEXICON` data structure is sufficient and should be used.
+- **DP-003**: End-to-end tests for `cli.py` should be avoided. Instead, tests should focus on the functions that query `api.py` and the functions responsible for handling specific commands.
 
 ## Success Criteria *(mandatory)*
 
@@ -71,20 +72,6 @@ As a user, I want the CLI to provide intelligent autocomplete suggestions to spe
 - Q: How should autocomplete handle sub-category navigation? → A: If a user types a category followed by a '/', the autocomplete should suggest sub-categories of that category.
 - Q: Should the full category path be displayed for a part or category? → A: Yes, the detailed data shown for a part or a category should include its category path, if applicable (e.g., `gates/not`).
 - Q: How should autocomplete results be cached? → A: Results of autocomplete get cached in `parts.parser.LEXICON` by `parts.api`. The API will try the cache first. The current `LEXICON` data structure is already correct and must be used.
+- Q: What is the testing strategy for `cli.py`? → A: e2e tests for `cli.py` should be avoided. Rather test the functions that will query `api.py`, and the ones handling commands.
 
-## Question 2: Error Handling for `get_next_legal_token_types`
 
-**Context**: The autocomplete relies on `parts/api.py::get_next_legal_token_types`.
-
-**What we need to know**: If `get_next_legal_token_types` encounters an unrecoverable error, how should the autocomplete feature behave?
-
-**Recommended:** Option A - This ensures a resilient user experience by providing a graceful fallback, preventing the autocomplete from crashing, and potentially logging the error for debugging without disrupting the user.
-
-| Option | Description | Implications |
-|--------|-------------|--------------|
-| A      | Display no suggestions but allow the user to continue typing. Log the error internally. | The user can still type, and the error can be investigated. |
-| B      | Display a generic error message to the user. | This might be disruptive to the user experience. |
-| C      | Disable autocomplete until the error is resolved. | This would severely impact usability. |
-| Short | Provide a different short answer (<=5 words) | Provide a different short answer (<=5 words) |
-
-You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.
