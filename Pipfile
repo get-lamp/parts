@@ -8,6 +8,7 @@ pydantic = "*"
 fastmcp = "*"
 sqlmodel = "*"
 prompt-toolkit = "*"
+hypothesis = "*"
 
 [dev-packages]
 ruff = "*"
