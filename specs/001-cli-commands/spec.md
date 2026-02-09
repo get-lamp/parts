@@ -19,6 +19,7 @@ As a user, I want to interact with the parts database through a command-line int
 3. **Given** a part identifier and a quantity, **When** I use the `+` operator, **Then** the part's quantity is increased.
 4. **Given** a part identifier and a quantity, **When** I use the `-` operator, **Then** the part's quantity is decreased.
 5. **Given** the `add cat` or `add part` command, **When** I follow the prompts, **Then** a new category or part is created in the database.
+6. **Given** a part or category identifier, **When** its details are displayed, **Then** the output MUST include the full category path (e.g., `gates/not`).
 
 ### User Story 2 - Advanced Autocomplete (Priority: P2)
 As a user, I want the CLI to provide intelligent autocomplete suggestions to speed up my workflow.
@@ -41,6 +42,7 @@ As a user, I want the CLI to provide intelligent autocomplete suggestions to spe
 - **FR-004**: Autocomplete MUST trigger on strings of 2 or more characters from an empty prompt.
 - **FR-005**: Autocomplete MUST offer continuations after a full word is typed.
 - **FR-006**: Autocomplete MUST suggest sub-categories when a category is followed by a '/'.
+- **FR-007**: The system MUST display the full, hierarchical category path (e.g., `parent/child/subchild`) when showing part or category details.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -50,6 +52,7 @@ As a user, I want the CLI to provide intelligent autocomplete suggestions to spe
 ### Dependencies and Assumptions
 
 - **DP-001**: Autocomplete functionality is dependent on the existing `parts/api.py::get_next_legal_token_types` function for narrowing down suggestions. This function can be refactored or improved as needed.
+- **DP-002**: Autocomplete results MUST be cached in `parts.parser.LEXICON`. The API will check the cache before computing new suggestions. The existing `LEXICON` data structure is sufficient and should be used.
 
 ## Success Criteria *(mandatory)*
 
@@ -66,6 +69,8 @@ As a user, I want the CLI to provide intelligent autocomplete suggestions to spe
 - Q: If `get_next_legal_token_types` encounters an unrecoverable error, how should the autocomplete feature behave? → A: Display no suggestions but allow the user to continue typing. Log the error internally.
 - Q: What should happen if a user provides a non-existent part identifier to a command like `show`, `+`, or `-`? → A: Display "Error: Part not found." to stderr.
 - Q: How should autocomplete handle sub-category navigation? → A: If a user types a category followed by a '/', the autocomplete should suggest sub-categories of that category.
+- Q: Should the full category path be displayed for a part or category? → A: Yes, the detailed data shown for a part or a category should include its category path, if applicable (e.g., `gates/not`).
+- Q: How should autocomplete results be cached? → A: Results of autocomplete get cached in `parts.parser.LEXICON` by `parts.api`. The API will try the cache first. The current `LEXICON` data structure is already correct and must be used.
 
 ## Question 2: Error Handling for `get_next_legal_token_types`
 
