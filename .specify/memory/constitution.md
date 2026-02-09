@@ -1,0 +1,76 @@
+<!--
+---
+Sync Impact Report
+---
+Version change: None -> 1.0.0
+Added sections:
+- Principle 1: Tech Stack
+- Principle 2: Libraries
+- Principle 3: Style
+- Principle 4: Testing
+- Principle 5: Layer Boundaries
+- Section 2: Existing Codebase
+- Section 3: Data Model
+Templates requiring updates: None
+Follow-up TODOs: None
+-->
+# Part Management System Constitution
+
+## Core Principles
+
+### I. Tech Stack
+- Python
+- SQLite
+- SQLModel
+
+### II. Libraries
+- Ruff for linting
+
+### III. Style
+- Characters per line limit is customized to 120
+- Code should minimize verbosity while preserving readability.
+- Prefer expression-oriented constructs, early returns, and standard library utilities over boilerplate abstractions.
+- Avoid unnecessary indirection, excessive comments, and over-engineered patterns.
+- Don't use classes. Use functions instead.
+- Comments must explain 'why' instead of 'what'
+
+### IV. Testing
+- All behavior must be covered by pytest tests.
+- Tests define expected behavior; generated code must not change tests without explicit instruction.
+- When possible, varying input should be tested using pytest.mark.parametrize. When parameterizing cannot be written in
+a simple way, separate test function should be used.
+- Tests functions should be named like test_{function_to_test}_{test_case}
+- Each app file should have its correspondent test file. Ie: parts.api.py -> tests/test_api.py
+
+### V. Layer Boundaries
+- cli.py is the entry point
+- cli.py uses parts.api.py
+- api.py uses parts.parser.py
+- api.py uses parts.db
+- api.py uses models.py
+- The above dependency graph can't be modifies
+
+## Existing Codebase
+
+- tests/conftest.py defines fixtures for setting up, seeding and tearing down the test database and other tools. Do not
+duplicate this functionality in other implementations. Use them when needed.
+- datasheet folder: contains PDF files referenced by part.datasheet on the database.
+- data folder: contains data migrated from a different system.
+- scripts/seed.py: implements a reader for the contents of data folder and seeds the DB with it.
+- parts.parser._grammar is a grammar transition table. This implementation will not be replaced, but it can be extended
+if new commands are incorporated or modified if existing ones change.
+- parts.parser.LEXICON is a cache, and this implementation will not be replaced.
+
+## Data Model
+
+- A token table store unique words from parts and categories. The context for the multiple instances of each word is
+stored in token_entity table.
+- DB entities will remain category, part, token and token_entity.
+
+## Governance
+
+- Do not modify code outside the explicitly provided scope.
+- Do not weaken tests, types, or validation to make code pass.
+- If requirements are ambiguous, ask for clarification instead of guessing.
+
+**Version**: 1.0.0 | **Ratified**: 2026-02-08 | **Last Amended**: 2026-02-08
