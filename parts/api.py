@@ -194,6 +194,16 @@ def find_token(db, string: str):
 """
 
 
+def delete_part(db: Session, part: Part):
+    db.delete(part)
+    db.commit()
+
+
+def delete_category(db: Session, category: Category):
+    db.delete(category)
+    db.commit()
+
+
 @with_db
 def match_token(db, string: str, token_types=None, entity_types=None):
     token_types = token_types or []

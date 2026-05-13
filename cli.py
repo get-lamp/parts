@@ -46,7 +46,7 @@ class CategoryPathCompleter(Completer):
 
 
 class GrammarAutocomplete(Completer):
-    COMMANDS = ["add", "datasheet", "del", "list"]
+    COMMANDS = ["add", "datasheet", "del", "list", "ll"]
 
     def get_completions(self, document, complete_event):
         words = document.text.split(" ")
@@ -65,15 +65,9 @@ class GrammarAutocomplete(Completer):
                 if cmd.startswith(last_word):
                     yield Completion(cmd, start_position=-len(last_word))
 
-        if command == "datasheet":
-            with get_db_context() as session:
-                for part in session.exec(select(Part).where(Part.datasheet.isnot(None))).all():
-                    if part.identifier.startswith(last_word):
-                        yield Completion(part.identifier, start_position=-len(last_word))
-            return
-
+        grammar_sentence = "list" if command in ("del", "datasheet", "ll") else " ".join(sentence)
         if len(last_word) >= 2 or len(sentence) >= 1:
-            next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
+            next_types, next_subtypes = api.get_next_legal_token_types(grammar_sentence)
             matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
             for match in matches:
                 yield Completion(match.identifier, start_position=-len(last_word))
@@ -110,7 +104,7 @@ def main():
                 add(args)
             elif command == "del":
                 delete(args)
-            elif command == "list":
+            elif command in ("list", "ll"):
                 list_items(args)
             elif command == "datasheet":
                 datasheet_cmd(args)
@@ -185,7 +179,7 @@ def delete(args):
         print("Usage: del <category-identifier>|<part-identifier>")
         return
 
-    identifier = args[0]
+    identifier = args[0].split("/")[-1]
 
     with get_db_context() as session:
         # Try to find and delete a part
