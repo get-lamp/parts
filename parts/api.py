@@ -4,7 +4,7 @@ import sys
 from uuid import uuid4
 
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import Session, select, SQLModel
 
 from parts import parser
@@ -96,15 +96,22 @@ def create_part(db: Session, identifier: str, descript: str, qty: int = 1, cat_i
 
 
 def list_parts(db, category_id=None):
-    query = select(Part).options(selectinload(Part.category).selectinload(Category.parent))
+    parent_cat = aliased(Category)
+    query = (
+        select(Part)
+        .options(selectinload(Part.category).selectinload(Category.parent))
+        .outerjoin(Category, Part.category_id == Category.identifier)
+        .outerjoin(parent_cat, Category.parent_id == parent_cat.id)
+        .order_by(parent_cat.identifier, Category.identifier, Part.identifier)
+    )
 
     if category_id:
         leaf = category_id.split("/")[-1]
         target_category = db.exec(select(Category).where(Category.identifier == leaf)).first()
         if target_category:
-            query = query.join(Part.category).where(Category.path.contains(target_category))
+            query = query.where(Category.path.contains(target_category))
         else:
-            return []  # Return empty if category not found
+            return []
 
     return db.execute(query).scalars().all()
 

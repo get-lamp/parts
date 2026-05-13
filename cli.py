@@ -1,6 +1,7 @@
 import subprocess
-from prompt_toolkit import PromptSession
+from prompt_toolkit import PromptSession, prompt as pt_prompt
 from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.document import Document
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 import parts.api as api
@@ -8,11 +9,43 @@ from parts.db import get_db_context
 from parts.models import Category, Part
 
 
-class GrammarAutocomplete(Completer):
-    def __init__(self):
-        self.sentence = []
+class CategoryPathCompleter(Completer):
+    def __init__(self, datasheets_only=False):
+        self.datasheets_only = datasheets_only
         super().__init__()
 
+    def get_completions(self, document, complete_event):
+        path_parts = document.text.split("/")
+        resolved = path_parts[:-1]
+        fragment = path_parts[-1]
+
+        with get_db_context() as session:
+            parent_id = None
+            current_cat = None
+            for component in resolved:
+                query = select(Category).where(Category.identifier == component)
+                if parent_id is not None:
+                    query = query.where(Category.parent_id == parent_id)
+                cat = session.exec(query).first()
+                if cat is None:
+                    return
+                parent_id = cat.id
+                current_cat = cat
+
+            for child in session.exec(select(Category).where(Category.parent_id == parent_id)).all():
+                if child.identifier.startswith(fragment):
+                    yield Completion(child.identifier, start_position=-len(fragment))
+
+            if current_cat is not None:
+                query = select(Part).where(Part.category_id == current_cat.identifier)
+                if self.datasheets_only:
+                    query = query.where(Part.datasheet.isnot(None))
+                for part in session.exec(query).all():
+                    if part.identifier.startswith(fragment):
+                        yield Completion(part.identifier, start_position=-len(fragment))
+
+
+class GrammarAutocomplete(Completer):
     COMMANDS = ["add", "datasheet", "del", "list"]
 
     def get_completions(self, document, complete_event):
@@ -21,63 +54,29 @@ class GrammarAutocomplete(Completer):
         last_word = words[-1]
         command = sentence[0] if sentence else None
 
+        if "/" in last_word:
+            yield from CategoryPathCompleter(datasheets_only=(command == "datasheet")).get_completions(
+                Document(last_word), complete_event
+            )
+            return
+
         if command is None:
             for cmd in self.COMMANDS:
                 if cmd.startswith(last_word):
                     yield Completion(cmd, start_position=-len(last_word))
-            return
-
-        if "/" in last_word:
-            yield from self._complete_category_path(last_word, datasheets_only=(command == "datasheet"))
-            return
 
         if command == "datasheet":
-            yield from self._complete_datasheet_part(last_word)
+            with get_db_context() as session:
+                for part in session.exec(select(Part).where(Part.datasheet.isnot(None))).all():
+                    if part.identifier.startswith(last_word):
+                        yield Completion(part.identifier, start_position=-len(last_word))
             return
 
-        next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
-
         if len(last_word) >= 2 or len(sentence) >= 1:
+            next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
             matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
-
             for match in matches:
                 yield Completion(match.identifier, start_position=-len(last_word))
-
-    def _complete_category_path(self, path_text, datasheets_only=False):
-        path_parts = path_text.split("/")
-        resolved = path_parts[:-1]
-        fragment = path_parts[-1]
-
-        with get_db_context() as session:
-            parent_id = None
-            current_cat = None
-            for component in resolved:
-                cat = session.exec(
-                    select(Category).where(Category.identifier == component).where(Category.parent_id == parent_id)
-                ).first()
-                if cat is None:
-                    return
-                parent_id = cat.id
-                current_cat = cat
-
-            children = session.exec(select(Category).where(Category.parent_id == parent_id)).all()
-            for child in children:
-                if child.identifier.startswith(fragment):
-                    yield Completion(child.identifier, start_position=-len(fragment))
-
-            if current_cat is not None:
-                query = select(Part).where(Part.category_id == current_cat.identifier)
-                if datasheets_only:
-                    query = query.where(Part.datasheet.isnot(None))
-                for part in session.exec(query).all():
-                    if part.identifier.startswith(fragment):
-                        yield Completion(part.identifier, start_position=-len(fragment))
-
-    def _complete_datasheet_part(self, fragment):
-        with get_db_context() as session:
-            for part in session.exec(select(Part).where(Part.datasheet.isnot(None))).all():
-                if part.identifier.startswith(fragment):
-                    yield Completion(part.identifier, start_position=-len(fragment))
 
         """
         # keywords
@@ -130,27 +129,55 @@ def main():
 
 
 def add(args):
-    if len(args) < 2:
-        print("Usage: add <category>[/<child-category>/...] <identifier> [<description>]")
-        return
+    category_str = None
+    identifier = None
 
-    category_path = args[0].split("/")
-    identifier = args[1]
-    description = " ".join(args[2:]) if len(args) > 2 else ""
+    if args:
+        arg = args[0]
+        if "/" in arg:
+            if arg.endswith("/"):
+                category_str = arg.rstrip("/")
+            else:
+                last_slash = arg.rfind("/")
+                category_str = arg[:last_slash]
+                identifier = arg[last_slash + 1:] or None
+        else:
+            identifier = arg
+
+    if category_str is None:
+        category_str = pt_prompt("category: ", completer=CategoryPathCompleter())
+
+    if identifier is None:
+        identifier = pt_prompt("identifier: ").strip()
+        while not identifier:
+            identifier = pt_prompt("identifier: ").strip()
+
+    description = pt_prompt("description: ")
+
+    qty_input = pt_prompt("qty: ", default="1").strip()
+    try:
+        qty = int(qty_input) if qty_input else 1
+    except ValueError:
+        qty = 1
+
+    category_components = [c for c in category_str.split("/") if c] if category_str else []
 
     with get_db_context() as session:
+        leaf_cat_identifier = None
         parent_id = None
-        for category_identifier in category_path:
-            category = api.get_or_create_category(session, identifier=category_identifier, parent_id=parent_id)
-            parent_id = category.id
+        for cat_id_str in category_components:
+            cat = api.get_or_create_category(session, identifier=cat_id_str, parent_id=parent_id)
+            parent_id = cat.id
+            leaf_cat_identifier = cat.identifier
 
         part = api.create_part(
             db=session,
-            cat_id=parent_id,
+            cat_id=leaf_cat_identifier,
             identifier=identifier,
             descript=description,
+            qty=qty,
         )
-        print(f"Added part: {part.identifier}")
+        print(f"Added: {part.identifier}")
 
 
 def delete(args):
