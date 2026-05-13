@@ -4,6 +4,7 @@ import sys
 from uuid import uuid4
 
 from sqlalchemy import and_, or_
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, SQLModel
 
 from parts import parser
@@ -95,7 +96,7 @@ def create_part(db: Session, identifier: str, descript: str, qty: int = 1, cat_i
 
 
 def list_parts(db, category_id=None):
-    query = select(Part)
+    query = select(Part).options(selectinload(Part.category).selectinload(Category.parent))
 
     if category_id:
         target_category = db.exec(select(Category).where(Category.identifier == category_id)).first()

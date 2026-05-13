@@ -134,11 +134,24 @@ def _get_category_path(category: Category) -> str:
 
 
 def list_items(args):
-    results = api.list(args)
 
-    for part in results:
-        output_line = f"{part.path} {part.description}" if part.path else f"{part.identifier} {part.description}"
-        print(output_line)
+    with get_db_context() as session:
+
+        results = api.list_parts(session, args)
+
+        rows = []
+        for part in results:
+            category_path = _get_category_path(part.category) if part.category else ""
+            rows.append((category_path, part.identifier, part.description or ""))
+
+        if not rows:
+            return
+
+        col1_w = max(len(r[0]) for r in rows)
+        col2_w = max(len(r[1]) for r in rows)
+
+        for cat, ident, desc in rows:
+            print(f"{cat:<{col1_w}}  {ident:<{col2_w}}  {desc}")
 
 
 def show_help():

@@ -53,16 +53,20 @@ def seed_data(session):
 
             if len(path_components) > 1:
                 temp_parent_id = None
+                parent_category_identifier = None
 
                 # All components EXCEPT the last one (the part identifier folder)
                 for component in path_components[:-1]:
                     category_key = (component, temp_parent_id)
                     if category_key in category_map:
-                        temp_parent_id = category_map[category_key].id
+                        cat = category_map[category_key]
+                        temp_parent_id = cat.id
+                        parent_category_identifier = cat.identifier
                     else:
                         print(f"Warning: Parent category '{component}' not found for path '{relative_path}'")
+                        parent_category_identifier = None
                         break
-                parent_category_id_for_part = temp_parent_id
+                parent_category_id_for_part = parent_category_identifier
 
             for file in files:
                 if file.endswith(".data"):
