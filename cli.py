@@ -85,9 +85,9 @@ def add(args):
 
         part = api.create_part(
             db=session,
-            category_id=parent_id,
+            cat_id=parent_id,
             identifier=identifier,
-            description=description,
+            descript=description,
         )
         print(f"Added part: {part.identifier}")
 

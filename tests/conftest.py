@@ -55,7 +55,7 @@ def seed(session):
             session,
             identifier=part,
             descript=f"-- {part} description --",
-            category_identifier=cats[parent].identifier if parent else None,
+            cat_id=cats[parent].identifier if parent else None,
         )
 
     session.commit()

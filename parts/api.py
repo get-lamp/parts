@@ -77,7 +77,7 @@ def list_categories(db, parent_id=None):
 
 
 def create_part(
-    db: Session, identifier: str, descript: str, qty: int = 1, category_identifier: str = None, datasheet: str = None
+    db: Session, identifier: str, descript: str, qty: int = 1, cat_id: str = None, datasheet: str = None
 ):
     part = db_insert(
         db=db,
@@ -87,7 +87,7 @@ def create_part(
             qty=qty,
             description=descript,
             datasheet=datasheet,
-            category_id=category_identifier,
+            category_id=cat_id,
         ),
     )
 
