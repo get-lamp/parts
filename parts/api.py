@@ -99,7 +99,8 @@ def list_parts(db, category_id=None):
     query = select(Part).options(selectinload(Part.category).selectinload(Category.parent))
 
     if category_id:
-        target_category = db.exec(select(Category).where(Category.identifier == category_id)).first()
+        leaf = category_id.split("/")[-1]
+        target_category = db.exec(select(Category).where(Category.identifier == leaf)).first()
         if target_category:
             query = query.join(Part.category).where(Category.path.contains(target_category))
         else:

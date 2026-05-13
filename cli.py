@@ -1,5 +1,6 @@
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 import parts.api as api
 from parts.db import get_db_context
@@ -12,8 +13,14 @@ class GrammarAutocomplete(Completer):
         super().__init__()
 
     def get_completions(self, document, complete_event):
-        sentence = document.text.split(" ")[:-1]
-        last_word = document.text.split(" ")[-1]
+        words = document.text.split(" ")
+        sentence = words[:-1]
+        last_word = words[-1]
+
+        if "/" in last_word:
+            yield from self._complete_category_path(last_word)
+            return
+
         next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
 
         if len(last_word) >= 2 or len(sentence) >= 1:
@@ -21,6 +28,34 @@ class GrammarAutocomplete(Completer):
 
             for match in matches:
                 yield Completion(match.identifier, start_position=-len(last_word))
+
+    def _complete_category_path(self, path_text):
+        path_parts = path_text.split("/")
+        resolved = path_parts[:-1]
+        fragment = path_parts[-1]
+
+        with get_db_context() as session:
+            parent_id = None
+            current_cat = None
+            for component in resolved:
+                cat = session.exec(
+                    select(Category).where(Category.identifier == component).where(Category.parent_id == parent_id)
+                ).first()
+                if cat is None:
+                    return
+                parent_id = cat.id
+                current_cat = cat
+
+            children = session.exec(select(Category).where(Category.parent_id == parent_id)).all()
+            for child in children:
+                if child.identifier.startswith(fragment):
+                    yield Completion(child.identifier, start_position=-len(fragment))
+
+            if current_cat is not None:
+                parts = session.exec(select(Part).where(Part.category_id == current_cat.identifier)).all()
+                for part in parts:
+                    if part.identifier.startswith(fragment):
+                        yield Completion(part.identifier, start_position=-len(fragment))
 
         """
         # keywords
@@ -60,6 +95,8 @@ def main():
                 show_help()
             elif command in ("exit", "q"):
                 break
+            elif not args:
+                _lookup(command)
             else:
                 print(f"Unknown command: {command}")
         except KeyboardInterrupt:
@@ -124,6 +161,38 @@ def delete(args):
         print(f"Part or category not found: {identifier}")
 
 
+def _lookup(token):
+    leaf = token.split("/")[-1]
+    with get_db_context() as session:
+        part = session.exec(
+            select(Part)
+            .where(Part.identifier == leaf)
+            .options(selectinload(Part.category).selectinload(Category.parent))
+        ).first()
+        if part:
+            _show_part(part)
+            return
+
+        category = session.exec(select(Category).where(Category.identifier == leaf)).first()
+        if category:
+            list_items([token])
+            return
+
+    print(f"Not found: {token}")
+
+
+def _show_part(part):
+    category_path = _get_category_path(part.category) if part.category else ""
+    print(f"identifier  {part.identifier}")
+    if category_path:
+        print(f"category    {category_path}")
+    print(f"qty         {part.qty or 0}")
+    if part.description:
+        print(f"description {part.description}")
+    if part.datasheet:
+        print(f"datasheet   {part.datasheet}")
+
+
 def _get_category_path(category: Category) -> str:
     path = [category.identifier]
     current = category
@@ -134,10 +203,8 @@ def _get_category_path(category: Category) -> str:
 
 
 def list_items(args):
-
     with get_db_context() as session:
-
-        results = api.list_parts(session, args)
+        results = api.list_parts(session, args[0] if args else None)
 
         rows = []
         for part in results:
