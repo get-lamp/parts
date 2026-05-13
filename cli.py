@@ -1,3 +1,4 @@
+import subprocess
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
 from sqlalchemy.orm import selectinload
@@ -12,13 +13,26 @@ class GrammarAutocomplete(Completer):
         self.sentence = []
         super().__init__()
 
+    COMMANDS = ["add", "datasheet", "del", "list"]
+
     def get_completions(self, document, complete_event):
         words = document.text.split(" ")
         sentence = words[:-1]
         last_word = words[-1]
+        command = sentence[0] if sentence else None
+
+        if command is None:
+            for cmd in self.COMMANDS:
+                if cmd.startswith(last_word):
+                    yield Completion(cmd, start_position=-len(last_word))
+            return
 
         if "/" in last_word:
-            yield from self._complete_category_path(last_word)
+            yield from self._complete_category_path(last_word, datasheets_only=(command == "datasheet"))
+            return
+
+        if command == "datasheet":
+            yield from self._complete_datasheet_part(last_word)
             return
 
         next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
@@ -29,7 +43,7 @@ class GrammarAutocomplete(Completer):
             for match in matches:
                 yield Completion(match.identifier, start_position=-len(last_word))
 
-    def _complete_category_path(self, path_text):
+    def _complete_category_path(self, path_text, datasheets_only=False):
         path_parts = path_text.split("/")
         resolved = path_parts[:-1]
         fragment = path_parts[-1]
@@ -52,10 +66,18 @@ class GrammarAutocomplete(Completer):
                     yield Completion(child.identifier, start_position=-len(fragment))
 
             if current_cat is not None:
-                parts = session.exec(select(Part).where(Part.category_id == current_cat.identifier)).all()
-                for part in parts:
+                query = select(Part).where(Part.category_id == current_cat.identifier)
+                if datasheets_only:
+                    query = query.where(Part.datasheet.isnot(None))
+                for part in session.exec(query).all():
                     if part.identifier.startswith(fragment):
                         yield Completion(part.identifier, start_position=-len(fragment))
+
+    def _complete_datasheet_part(self, fragment):
+        with get_db_context() as session:
+            for part in session.exec(select(Part).where(Part.datasheet.isnot(None))).all():
+                if part.identifier.startswith(fragment):
+                    yield Completion(part.identifier, start_position=-len(fragment))
 
         """
         # keywords
@@ -91,6 +113,8 @@ def main():
                 delete(args)
             elif command == "list":
                 list_items(args)
+            elif command == "datasheet":
+                datasheet_cmd(args)
             elif command == "help":
                 show_help()
             elif command in ("exit", "q"):
@@ -202,23 +226,41 @@ def _get_category_path(category: Category) -> str:
     return "/".join(reversed(path))
 
 
+def _print_parts_table(parts):
+    rows = [((_get_category_path(p.category) if p.category else ""), p.identifier, p.description or "") for p in parts]
+    if not rows:
+        return
+    col1_w = max(len(r[0]) for r in rows)
+    col2_w = max(len(r[1]) for r in rows)
+    for cat, ident, desc in rows:
+        print(f"{cat:<{col1_w}}  {ident:<{col2_w}}  {desc}")
+
+
 def list_items(args):
     with get_db_context() as session:
         results = api.list_parts(session, args[0] if args else None)
+        _print_parts_table(results)
 
-        rows = []
-        for part in results:
-            category_path = _get_category_path(part.category) if part.category else ""
-            rows.append((category_path, part.identifier, part.description or ""))
 
-        if not rows:
-            return
+def datasheet_cmd(args):
+    if not args:
+        with get_db_context() as session:
+            results = [p for p in api.list_parts(session) if p.datasheet]
+            _print_parts_table(results)
+        return
 
-        col1_w = max(len(r[0]) for r in rows)
-        col2_w = max(len(r[1]) for r in rows)
+    leaf = args[0].split("/")[-1]
+    with get_db_context() as session:
+        part = session.exec(select(Part).where(Part.identifier == leaf)).first()
 
-        for cat, ident, desc in rows:
-            print(f"{cat:<{col1_w}}  {ident:<{col2_w}}  {desc}")
+    if not part:
+        print(f"Part not found: {leaf}")
+        return
+    if not part.datasheet:
+        print(f"No datasheet for: {part.identifier}")
+        return
+
+    subprocess.run(["open", part.datasheet])
 
 
 def show_help():
