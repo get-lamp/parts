@@ -76,9 +76,7 @@ def list_categories(db, parent_id=None):
     return db.execute(query).scalars().all()
 
 
-def create_part(
-    db: Session, identifier: str, descript: str, qty: int = 1, cat_id: str = None, datasheet: str = None
-):
+def create_part(db: Session, identifier: str, descript: str, qty: int = 1, cat_id: str = None, datasheet: str = None):
     part = db_insert(
         db=db,
         obj=Part(

@@ -60,10 +60,7 @@ def seed_data(session):
                     if category_key in category_map:
                         temp_parent_id = category_map[category_key].id
                     else:
-                        print(
-                            f"Warning: Parent category '{component}' "
-                            f"not found for path '{relative_path}'"
-                        )
+                        print(f"Warning: Parent category '{component}' not found for path '{relative_path}'")
                         break
                 parent_category_id_for_part = temp_parent_id
 
