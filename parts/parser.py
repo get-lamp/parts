@@ -35,6 +35,7 @@ PART_QTY = "part:qty"
 CAT_ID = "category:identifier"
 OP_SLASH = "operator:slash"
 OP_PLUS = "operator:plus"
+OP_MINUS = "operator:minus"
 NUMBER = "value:number"
 STRING = "value:string"
 
@@ -44,7 +45,7 @@ _grammar = {
     KEYWORD_DATASHEET: {CAT_ID: lambda: _grammar[CAT_ID]},
     KEYWORD_DEL: {CAT_ID: lambda: _grammar[CAT_ID]},
     CAT_ID: {None: None, OP_SLASH: lambda: _grammar[CAT_ID], PART_ID: lambda: _grammar[PART_ID]},
-    PART_ID: {None: None, OP_PLUS: {NUMBER: None}},
+    PART_ID: {None: None, OP_PLUS: {NUMBER: None}, OP_MINUS: {NUMBER: None}, NUMBER: {None: None}},
 }
 
 LEXICON = {
@@ -60,6 +61,7 @@ LEXICON = {
     "q": [KEYWORD_QUIT],
     "/": [OP_SLASH],
     "+": [OP_PLUS],
+    "-": [OP_MINUS],
 }
 
 
@@ -75,7 +77,6 @@ def _get_word_types(word):
 
 
 def parse(sentence):
-
     if len(sentence) == 0:
         return _grammar
 

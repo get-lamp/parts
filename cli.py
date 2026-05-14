@@ -76,6 +76,48 @@ class GrammarAutocomplete(Completer):
                 yield Completion(match.identifier, start_position=-len(last_word))
 
 
+def _parse_qty(s):
+    """Parse '+3' -> ('add', 3), '-1' -> ('sub', 1), '42' -> ('set', 42). Returns (None, None) if not a qty arg."""
+    if s.startswith("+"):
+        try:
+            return ("add", int(s[1:]))
+        except ValueError:
+            return (None, None)
+    elif s.startswith("-"):
+        try:
+            return ("sub", int(s[1:]))
+        except ValueError:
+            return (None, None)
+    else:
+        try:
+            return ("set", int(s))
+        except ValueError:
+            return (None, None)
+
+
+def update_qty(part_ref, arg):
+    op, val = _parse_qty(arg)
+    leaf = part_ref.split("/")[-1]
+    with get_db_context() as session:
+        part = session.exec(
+            select(Part)
+            .where(Part.identifier == leaf)
+            .options(selectinload(Part.category).selectinload(Category.parent))
+        ).first()
+        if not part:
+            print(f"Part not found: {leaf}")
+            return
+        if op == "add":
+            part.qty = (part.qty or 0) + val
+        elif op == "sub":
+            part.qty = (part.qty or 0) - val
+        else:
+            part.qty = val
+        session.add(part)
+        session.commit()
+        _show_part(part)
+
+
 def main():
     # api.init()
 
@@ -108,6 +150,8 @@ def main():
                 break
             elif not args:
                 _lookup(command)
+            elif _parse_qty(args[0]) != (None, None):
+                update_qty(command, args[0])
             else:
                 print(f"Unknown command: {command}")
         except KeyboardInterrupt:
@@ -180,6 +224,9 @@ def delete(args):
         statement = select(Part).where(Part.identifier == identifier)
         part = session.exec(statement).first()
         if part:
+            confirm = input(f"Delete part '{identifier}'? [y/N] ")
+            if confirm.lower() not in ("y", "yes"):
+                return
             api.delete_part(session, part)
             print(f"Deleted part: {identifier}")
             return
@@ -188,11 +235,14 @@ def delete(args):
         statement = select(Category).where(Category.identifier == identifier)
         category = session.exec(statement).first()
         if category:
-            # Check if the category is empty
             if category.parts or category.children:
-                print(f"Category is not empty: {identifier}")
-                return
-
+                confirm = input(f"Category '{identifier}' is not empty. Delete anyway? [y/N] ")
+                if confirm.lower() not in ("y", "yes"):
+                    return
+            else:
+                confirm = input(f"Delete category '{identifier}'? [y/N] ")
+                if confirm.lower() not in ("y", "yes"):
+                    return
             api.delete_category(session, category)
             print(f"Deleted category: {identifier}")
             return
@@ -242,13 +292,14 @@ def _get_category_path(category: Category) -> str:
 
 
 def _print_parts_table(parts):
-    rows = [((_get_category_path(p.category) if p.category else ""), p.identifier, p.description or "") for p in parts]
+    rows = [((_get_category_path(p.category) if p.category else ""), p.identifier, str(p.qty or 0), p.description or "") for p in parts]
     if not rows:
         return
     col1_w = max(len(r[0]) for r in rows)
     col2_w = max(len(r[1]) for r in rows)
-    for cat, ident, desc in rows:
-        print(f"{cat:<{col1_w}}  {ident:<{col2_w}}  {desc}")
+    col3_w = max(len(r[2]) for r in rows)
+    for cat, ident, qty, desc in rows:
+        print(f"{cat:<{col1_w}}  {ident:<{col2_w}}  {qty:>{col3_w}}  {desc}")
 
 
 def list_items(args):
