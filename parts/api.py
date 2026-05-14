@@ -114,7 +114,7 @@ def list_parts(db, category_id=None):
         if target_category:
             query = query.where(Category.path.contains(target_category))
         else:
-            return []
+            query = query.where(Part.identifier.contains(leaf))
 
     return db.execute(query).scalars().all()
 

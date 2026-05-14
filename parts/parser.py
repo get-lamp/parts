@@ -75,6 +75,10 @@ def _get_word_types(word):
 
 
 def parse(sentence):
+
+    if len(sentence) == 0:
+        return _grammar
+
     words = sentence.split(" ")
     found = False
     legal_types = _grammar
