@@ -1,7 +1,7 @@
 # PARTS
 CLI electronic parts inventory
 
-![Coverage](https://codecov.io/gh/get-lamp/parts/branch/master/graph/badge.svg)
+[![codecov](https://codecov.io/github/get-lamp/parts/graph/badge.svg?token=N5Z3LBO0ID)](https://codecov.io/github/get-lamp/parts)
 
 ![List command](./img/scr_list.png)
 
