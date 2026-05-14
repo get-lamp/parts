@@ -1,6 +1,8 @@
 # PARTS
 CLI electronic parts inventory
 
+![Coverage](https://codecov.io/gh/get-lamp/parts/branch/master/graph/badge.svg)
+
 ![List command](./img/scr_list.png)
 
 ![Autocomplete](./img/src_autocomplete.png)
