@@ -207,7 +207,6 @@ def delete_category(db: Session, category: Category):
     db.commit()
 
 
-@with_db
 def match_token(db, string: str, token_types=None, entity_types=None):
     token_types = token_types or []
 

@@ -71,9 +71,10 @@ class GrammarAutocomplete(Completer):
             if len(next_types) == 0:
                 return
 
-            matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
-            for match in matches:
-                yield Completion(match.identifier, start_position=-len(last_word))
+            with get_db_context() as session:
+                matches = api.match_token(session, last_word, entity_types=next_types, token_types=next_subtypes)
+                for match in matches:
+                    yield Completion(match.identifier, start_position=-len(last_word))
 
 
 def _parse_qty(s):
