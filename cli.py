@@ -46,7 +46,7 @@ class CategoryPathCompleter(Completer):
 
 
 class GrammarAutocomplete(Completer):
-    COMMANDS = ["add", "datasheet", "del", "list", "ll"]
+    COMMANDS = ["add", "datasheet", "del", "list", "ll", "exit", "quit", "q"]
 
     def get_completions(self, document, complete_event):
         words = document.text.split(" ")
@@ -65,26 +65,15 @@ class GrammarAutocomplete(Completer):
                 if cmd.startswith(last_word):
                     yield Completion(cmd, start_position=-len(last_word))
 
-        grammar_sentence = "list" if command in ("del", "datasheet", "ll") else " ".join(sentence)
         if len(last_word) >= 2 or len(sentence) >= 1:
-            next_types, next_subtypes = api.get_next_legal_token_types(grammar_sentence)
+            next_types, next_subtypes = api.get_next_legal_token_types(" ".join(sentence))
+
+            if len(next_types) == 0:
+                return
+
             matches = api.match_token(last_word, entity_types=next_types, token_types=next_subtypes)
             for match in matches:
                 yield Completion(match.identifier, start_position=-len(last_word))
-
-        """
-        # keywords
-        for keyword in self.grammar.keywords:
-            if keyword.startswith(last_word):
-                yield Completion(keyword, start_position=-len(last_word))
-
-        # identifiers
-        if len(last_word) >= 2:
-            matches = parts.parser.api.match_token(last_word, entity_types=[], token_types=["identifier"])
-
-            for match in matches:
-                yield Completion(match.identifier, start_position=-len(last_word))
-        """
 
 
 def main():
@@ -97,7 +86,12 @@ def main():
         try:
             text = session.prompt("> ", completer=completer)
             parts = text.split()
+            if len(text) == 0:
+                continue
+
+            # first word is the command
             command = parts[0]
+            # rest of the line is passed by argument to the command handler
             args = parts[1:]
 
             if command == "add":
@@ -110,7 +104,7 @@ def main():
                 datasheet_cmd(args)
             elif command == "help":
                 show_help()
-            elif command in ("exit", "q"):
+            elif command in ("quit", "exit", "q"):
                 break
             elif not args:
                 _lookup(command)
@@ -134,7 +128,7 @@ def add(args):
             else:
                 last_slash = arg.rfind("/")
                 category_str = arg[:last_slash]
-                identifier = arg[last_slash + 1:] or None
+                identifier = arg[last_slash + 1 :] or None
         else:
             identifier = arg
 

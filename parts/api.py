@@ -64,9 +64,12 @@ def tokenize(db: Session, entity: SQLModel):
 
 
 def get_next_legal_token_types(sentence: str):
-    types, subtypes = zip(*map(lambda s: s.split(":"), parser.parse(sentence).keys()))
-    return set(types), set(subtypes)
 
+    if legal := parser.parse(sentence).keys():
+        types, subtypes = zip(*map(lambda s: s.split(":"), legal))
+        return set(types), set(subtypes)
+    else:
+        return set(), set()
 
 def list_categories(db, parent_id=None):
     query = select(Category)

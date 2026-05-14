@@ -25,6 +25,7 @@ class TokenEntity(SQLModel, table=True):
 KEYWORD_ADD = "keyword:add"
 KEYWORD_DEL = "keyword:del"
 KEYWORD_LIST = "keyword:list"
+KEYWORD_DATASHEET = "keyword:datasheet"
 KEYWORD_FIND = "keyword:find"
 KEYWORD_HELP = "keyword:help"
 KEYWORD_QUIT = "keyword:quit"
@@ -40,7 +41,8 @@ STRING = "value:string"
 _grammar = {
     KEYWORD_ADD: {PART_ID: {PART_QTY: {PART_DESCRIPT: None}}, CAT_ID: lambda: _grammar[CAT_ID]},
     KEYWORD_LIST: {CAT_ID: lambda: _grammar[CAT_ID]},
-    KEYWORD_DEL: {lambda: _grammar[PART_ID], lambda: _grammar[CAT_ID]},
+    KEYWORD_DATASHEET: {CAT_ID: lambda: _grammar[CAT_ID]},
+    KEYWORD_DEL: {CAT_ID: lambda: _grammar[CAT_ID]},
     CAT_ID: {None: None, OP_SLASH: lambda: _grammar[CAT_ID], PART_ID: lambda: _grammar[PART_ID]},
     PART_ID: {None: None, OP_PLUS: {NUMBER: None}},
 }
@@ -49,6 +51,7 @@ LEXICON = {
     "add": [KEYWORD_ADD],
     "del": [KEYWORD_DEL],
     "list": [KEYWORD_LIST],
+    "datasheet": [KEYWORD_DATASHEET],
     "find": [KEYWORD_FIND],
     "help": [KEYWORD_HELP],
     "h": [KEYWORD_HELP],
@@ -73,19 +76,21 @@ def _get_word_types(word):
 
 def parse(sentence):
     words = sentence.split(" ")
-
+    found = False
     legal_types = _grammar
 
     while len(words) > 0:
+        found = False
         word = words.pop(0)
         word_types = _get_word_types(word)
 
         for legal_type in legal_types or []:
             if legal_type in word_types:
                 legal_types = legal_types[legal_type]
+                found = True
                 break
 
-    return legal_types
+    return legal_types if found else {}
 
 
 def add_to_lexicon(word, type_):
