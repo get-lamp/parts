@@ -15,10 +15,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -r requirements.txt
-      - run: pip install coverage pytest
+      - name: Install pipenv
+        run: pip install pipenv
 
-      - run: coverage run -m pytest
-      - run: coverage xml
+      - name: Install dependencies
+        run: pipenv install --dev
+
+      - name: Run tests with coverage
+        run: |
+          pipenv run pytest --cov=. --cov-report=xml
 
       - uses: codecov/codecov-action@v4
