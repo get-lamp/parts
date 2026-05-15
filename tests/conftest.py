@@ -1,9 +1,11 @@
-import pytest
 import os
+
+import pytest
 from sqlmodel import Session, create_engine, SQLModel
+
 from parts import parser as g
-from . import data
 from parts.api import create_category, create_part
+from . import data
 
 TEST_DB_FILENAME = "test_parts.db"
 

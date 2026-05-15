@@ -1,7 +1,8 @@
 from sqlmodel import select
+
 from parts import api
 from parts.models import Part, Category
-from parts.parser import Token, TokenEntity
+from parts.parser import TokenEntity
 from . import data
 
 
@@ -9,6 +10,7 @@ def test_get_next_legal_token_types():
     types, subtypes = api.get_next_legal_token_types("list")
     assert "keyword" not in types
     assert "category" in types
+    assert "identifier" in subtypes
 
 
 def test_get_next_legal_token_types_invalid():

@@ -1,5 +1,6 @@
-from sqlmodel import create_engine, SQLModel, Session
 import functools
+
+from sqlmodel import create_engine, SQLModel, Session
 
 SQLITE_FILE_NAME = "parts.db"
 SQLITE_URL = f"sqlite:///{SQLITE_FILE_NAME}"
@@ -29,7 +30,3 @@ def db_insert(db: Session, obj: SQLModel):
     db.commit()
     db.refresh(obj)
     return obj
-
-
-def db_get(db: Session, model: SQLModel, item_id: int):
-    return db.get(model, item_id)
