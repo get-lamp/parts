@@ -15,5 +15,6 @@ test:
 coverage:
 	@pipenv run python -m pytest tests/ -v \
 		--cov=parts \
+		--cov-branch \
 		--cov-report=term-missing \
 		--cov-report=html

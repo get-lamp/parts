@@ -61,3 +61,8 @@ def test_parse_keywords():
     assert g.parse("list") == {g.CAT_ID: ANY}
     assert g.parse("del") == {g.CAT_ID: ANY}
     assert g.parse("datasheet") == {g.CAT_ID: ANY}
+
+
+def test_add_to_lexicon():
+    g.add_to_lexicon("testword", g.PART_ID)
+    assert g.PART_ID in g.LEXICON["testword"]
